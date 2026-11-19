@@ -24,7 +24,7 @@ const servidor = crearServidor({
   mensajesPorMinuto: config.MAX_MENSAJES_POR_MINUTO,
   ...(config.ACCESS_KEY ? { claveAcceso: config.ACCESS_KEY } : {}),
   exigirClave: config.EXIGIR_ACCESS_KEY === "1",
-  confiarProxy: config.TRUST_PROXY === "1",
+  proxiesConfiables: config.TRUST_PROXY,
 })
 
 if (config.EXIGIR_ACCESS_KEY === "1" && !config.ACCESS_KEY) {

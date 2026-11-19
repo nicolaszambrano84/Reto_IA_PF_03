@@ -32,9 +32,16 @@ export interface OpcionesApp {
   claveAcceso?: string
   /** Si es true y no hay claveAcceso, la API queda bloqueada (falla cerrado) en vez de abierta. */
   exigirClave?: boolean
-  /** true detrás de un proxy confiable (Render): la IP del cliente sale de X-Forwarded-For. */
-  confiarProxy: boolean
+  /**
+   * Número de proxies confiables delante de la app (0 = ninguno). La IP del cliente se toma de
+   * X-Forwarded-For contando esos saltos desde la derecha. En Render son 2 (Cloudflare + su proxy).
+   */
+  proxiesConfiables: number
 }
+
+/** Intentos con una clave de acceso equivocada permitidos por IP antes de bloquearla (fuerza bruta). */
+const MAX_FALLOS_CLAVE = 10
+const VENTANA_FALLOS_CLAVE_MS = 15 * 60_000
 
 const CuerpoChatSchema = z.object({
   sessionId: IdSesionSchema.optional(),
@@ -67,7 +74,22 @@ class ErrorHttp extends Error {
 export function crearServidor(o: OpcionesApp): Server {
   const sesiones = new AlmacenSesiones(path.join(o.raiz, "out", "sesiones"))
   const presupuesto = new PresupuestoDiario(o.maxTokensDia)
-  const limitador = new LimitadorPorIp(o.mensajesPorMinuto)
+  const limitador = new VentanaPorIp(o.mensajesPorMinuto, 60_000)
+  const fallosClave = new VentanaPorIp(MAX_FALLOS_CLAVE, VENTANA_FALLOS_CLAVE_MS)
+
+  /**
+   * Clave de acceso con freno a la fuerza bruta: tras MAX_FALLOS_CLAVE intentos con una clave
+   * equivocada, la IP queda bloqueada aunque después acierte (si no, el 200 delataría el acierto).
+   * No enviar clave (primera carga del front) no cuenta como intento.
+   */
+  function rechazoDeClave(req: IncomingMessage): ErrorHttp | null {
+    if (!o.claveAcceso) return null
+    const ip = ipDe(req, o.proxiesConfiables)
+    if (fallosClave.agotado(ip)) return new ErrorHttp(429, "Demasiados intentos con una clave de acceso inválida. Espera unos minutos.")
+    if (claveValida(req, o.claveAcceso)) return null
+    if (typeof req.headers["x-access-key"] === "string") fallosClave.registrar(ip)
+    return new ErrorHttp(401, "Falta la clave de acceso o no es válida.")
+  }
 
   async function atender(req: IncomingMessage, res: ServerResponse): Promise<void> {
     cabecerasDeSeguridad(req, res)
@@ -81,7 +103,8 @@ export function crearServidor(o: OpcionesApp): Server {
     if (o.exigirClave && !o.claveAcceso) {
       return responderJson(res, 503, { error: "El servicio no tiene configurada su clave de acceso (ACCESS_KEY); la API está bloqueada hasta configurarla." })
     }
-    if (!claveValida(req, o.claveAcceso)) return responderJson(res, 401, { error: "Falta la clave de acceso o no es válida." })
+    const rechazo = rechazoDeClave(req)
+    if (rechazo) return responderJson(res, rechazo.estado, { error: rechazo.message })
 
     if (metodo === "GET" && ruta === "/api/config") {
       return responderJson(res, 200, { provider: o.proveedor.nombre, model: o.proveedor.modelo, aviso: o.avisoProveedor, casos: await listarCasos(o.raiz) })
@@ -102,7 +125,7 @@ export function crearServidor(o: OpcionesApp): Server {
   }
 
   async function prepararTurno(req: IncomingMessage): Promise<{ sesion: Sesion; mensaje: string }> {
-    if (!limitador.permitir(ipDe(req, o.confiarProxy))) throw new ErrorHttp(429, "Demasiados mensajes en poco tiempo. Espera un minuto.")
+    if (!limitador.permitir(ipDe(req, o.proxiesConfiables))) throw new ErrorHttp(429, "Demasiados mensajes en poco tiempo. Espera un minuto.")
     const datos = CuerpoChatSchema.safeParse(await leerJson(req, 64 * 1024))
     if (!datos.success) throw new ErrorHttp(400, `Solicitud inválida: ${describirProblemas(datos.error)}`)
     const id = datos.data.sessionId
@@ -190,8 +213,7 @@ async function servirArchivo(res: ServerResponse, ruta: string): Promise<void> {
 }
 
 /** Comparación en tiempo constante (sobre los hashes, para no filtrar ni siquiera el largo de la clave). */
-function claveValida(req: IncomingMessage, clave: string | undefined): boolean {
-  if (!clave) return true
+function claveValida(req: IncomingMessage, clave: string): boolean {
   const recibida = req.headers["x-access-key"]
   if (typeof recibida !== "string") return false
   const huella = (t: string) => createHash("sha256").update(t).digest()
@@ -218,25 +240,52 @@ async function leerJson(req: IncomingMessage, maximo: number): Promise<unknown> 
   }
 }
 
-function ipDe(req: IncomingMessage, confiarProxy: boolean): string {
+/**
+ * IP del cliente para los límites. Cada proxy AGREGA al final de X-Forwarded-For la IP que se le
+ * conectó, y lo que está a la izquierda lo pudo escribir el propio cliente. Por eso se cuentan los
+ * saltos desde la derecha (como `trust proxy N` en Express) y nunca se toma el primer valor: un
+ * atacante podría falsificarlo en cada petición y evadir el límite.
+ * En Render: Cliente → Cloudflare → proxy de Render → app, y X-Forwarded-For = "<cliente>, <Cloudflare>".
+ */
+export function ipDe(req: Pick<IncomingMessage, "headers" | "socket">, proxiesConfiables: number): string {
+  const directa = req.socket.remoteAddress ?? "desconocida"
   const reenviada = req.headers["x-forwarded-for"]
-  if (confiarProxy && typeof reenviada === "string") return reenviada.split(",")[0]?.trim() || "desconocida"
-  return req.socket.remoteAddress ?? "desconocida"
+  if (proxiesConfiables < 1 || typeof reenviada !== "string") return directa
+  const saltos = reenviada.split(",").map((ip) => ip.trim()).filter(Boolean)
+  return saltos[Math.max(0, saltos.length - proxiesConfiables)] ?? directa
 }
 
-/** Ventana deslizante de 60 s por IP para POST /api/chat (control de abuso y de costo). */
-class LimitadorPorIp {
+/** Ventana deslizante por IP: límite de mensajes al chat y de intentos fallidos de clave. */
+class VentanaPorIp {
   private readonly marcas = new Map<string, number[]>()
 
-  constructor(private readonly porMinuto: number) {}
+  constructor(
+    private readonly maximo: number,
+    private readonly ventanaMs: number,
+  ) {}
 
-  permitir(ip: string): boolean {
-    const ahora = Date.now()
-    const recientes = (this.marcas.get(ip) ?? []).filter((t) => ahora - t < 60_000)
-    const permitido = recientes.length < this.porMinuto
-    if (permitido) recientes.push(ahora)
+  /** ¿La IP ya agotó su cupo en la ventana? (no registra nada) */
+  agotado(ip: string): boolean {
+    return this.recientes(ip).length >= this.maximo
+  }
+
+  registrar(ip: string): void {
+    const recientes = this.recientes(ip)
+    recientes.push(Date.now())
+    // Tope de memoria: con IP no falsificable, llenar el mapa exige miles de IP reales.
     if (this.marcas.size > 10_000) this.marcas.clear()
     this.marcas.set(ip, recientes)
-    return permitido
+  }
+
+  /** Registra el evento solo si cabe en el cupo. */
+  permitir(ip: string): boolean {
+    if (this.agotado(ip)) return false
+    this.registrar(ip)
+    return true
+  }
+
+  private recientes(ip: string): number[] {
+    const ahora = Date.now()
+    return (this.marcas.get(ip) ?? []).filter((t) => ahora - t < this.ventanaMs)
   }
 }

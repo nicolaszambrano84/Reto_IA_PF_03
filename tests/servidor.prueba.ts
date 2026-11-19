@@ -1,7 +1,8 @@
 import assert from "node:assert/strict"
 import type { AddressInfo } from "node:net"
 import path from "node:path"
-import { crearServidor, type OpcionesApp } from "../src/app"
+import { crearServidor, ipDe, type OpcionesApp } from "../src/app"
+import { leerConfiguracion } from "../src/config"
 import { ProveedorSimulado } from "../src/llm/simulado"
 import { grupo, nuevaRaiz, prueba } from "./arnes"
 import { RAIZ_PROYECTO } from "./sinteticos"
@@ -19,7 +20,7 @@ async function levantar(extra: Partial<OpcionesApp> = {}): Promise<{ url: string
     maxTokensSesion: 1_000_000,
     maxTokensDia: 10_000_000,
     mensajesPorMinuto: 50,
-    confiarProxy: false,
+    proxiesConfiables: 0,
     ...extra,
   })
   await new Promise<void>((listo) => servidor.listen(0, "127.0.0.1", listo))
@@ -138,6 +139,40 @@ prueba("Límite de mensajes por minuto por IP → 429", async () => {
   } finally {
     await s.cerrar()
   }
+})
+
+prueba("Fuerza bruta: tras 10 claves equivocadas la IP queda bloqueada (429), incluso si después acierta", async () => {
+  const s = await levantar({ claveAcceso: "clave-de-acceso-secreta" })
+  try {
+    const config = (clave?: string) => fetch(`${s.url}/api/config`, clave ? { headers: { "x-access-key": clave } } : {})
+    for (let i = 0; i < 3; i++) assert.equal((await config()).status, 401, "sin clave (primera carga del front) no cuenta como intento")
+    for (let i = 0; i < 10; i++) assert.equal((await config(`intento-equivocado-${i}`)).status, 401)
+    assert.equal((await config("intento-equivocado-11")).status, 429)
+    assert.equal((await config("clave-de-acceso-secreta")).status, 429, "un acierto durante el bloqueo no se delata con un 200")
+  } finally {
+    await s.cerrar()
+  }
+})
+
+prueba("IP del cliente: se cuentan los proxies desde la derecha de X-Forwarded-For (no se puede falsificar)", () => {
+  const req = (xff?: string) => ({ headers: xff ? { "x-forwarded-for": xff } : {}, socket: { remoteAddress: "10.0.0.9" } }) as Parameters<typeof ipDe>[0]
+  // Sin proxy confiable, la cabecera se ignora: la escribe el cliente.
+  assert.equal(ipDe(req("1.1.1.1"), 0), "10.0.0.9")
+  // Render: Cliente → Cloudflare → proxy de Render. La cabecera llega como "<cliente>, <Cloudflare>".
+  assert.equal(ipDe(req("200.1.1.1, 104.22.17.40"), 2), "200.1.1.1")
+  // El atacante antepone valores falsos: la IP que agregó Cloudflare sigue siendo la que cuenta.
+  assert.equal(ipDe(req("6.6.6.6, 7.7.7.7, 200.1.1.1, 104.22.17.40"), 2), "200.1.1.1")
+  assert.equal(ipDe(req("6.6.6.6, 200.1.1.1"), 1), "200.1.1.1")
+  assert.equal(ipDe(req(), 2), "10.0.0.9")
+})
+
+prueba("Configuración: la clave de acceso exige 16 caracteres y TRUST_PROXY es un número de saltos", () => {
+  assert.throws(() => leerConfiguracion({ ACCESS_KEY: "corta123" }), /ACCESS_KEY/)
+  assert.throws(() => leerConfiguracion({ TRUST_PROXY: "si" }), /TRUST_PROXY/)
+  const c = leerConfiguracion({ ACCESS_KEY: "x".repeat(16), TRUST_PROXY: "2" })
+  assert.equal(c.TRUST_PROXY, 2)
+  // El mensaje de error nombra la variable, nunca su valor.
+  assert.throws(() => leerConfiguracion({ ACCESS_KEY: "valor-secreto" }), (e: Error) => !e.message.includes("valor-secreto"))
 })
 
 prueba("Streaming: /api/chat/stream emite cada herramienta mientras ocurre y luego la respuesta", async () => {

@@ -26,9 +26,10 @@ services:
       # Falla cerrado: si ACCESS_KEY quedó vacía, la API se bloquea (503) en vez de quedar abierta.
       - key: EXIGIR_ACCESS_KEY
         value: "1"
-      # Render atiende detrás de su proxy: el límite por IP usa la IP real del cliente.
+      # Render atiende detrás de dos proxies (Cloudflare + el suyo), que agregan al final de
+      # X-Forwarded-For: el límite por IP cuenta 2 saltos desde la derecha (no se puede falsificar).
       - key: TRUST_PROXY
-        value: "1"
+        value: "2"
       - key: MAX_TOKENS_DIA
         value: "2000000"
       - key: MAX_MENSAJES_POR_MINUTO

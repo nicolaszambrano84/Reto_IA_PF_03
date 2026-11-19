@@ -38,12 +38,12 @@ const ConfigSchema = z.object({
   MAX_TOKENS_SESION: entero(1000, 400000),
   MAX_TOKENS_DIA: entero(1000, 3000000),
   MAX_MENSAJES_POR_MINUTO: entero(1, 12),
-  /** Si se define, /api/* y /out/* exigen la cabecera x-access-key. */
-  ACCESS_KEY: z.string().min(8).optional(),
+  /** Si se define, /api/* y /out/* exigen la cabecera x-access-key. Mínimo 16 caracteres. */
+  ACCESS_KEY: z.string().min(16).optional(),
   /** "1" en despliegues públicos: sin ACCESS_KEY la API queda bloqueada (falla cerrado) en vez de abierta. */
   EXIGIR_ACCESS_KEY: z.enum(["0", "1"]).default("0"),
-  /** "1" detrás de un proxy confiable (Render) para tomar la IP de X-Forwarded-For. */
-  TRUST_PROXY: z.enum(["0", "1"]).default("0"),
+  /** Proxies confiables delante de la app (0 = ninguno; Render = 2: Cloudflare + su proxy) para la IP del cliente. */
+  TRUST_PROXY: z.coerce.number().int().min(0).max(5).default(0),
 })
 
 export type Configuracion = z.infer<typeof ConfigSchema>
