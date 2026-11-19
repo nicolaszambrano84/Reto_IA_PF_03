@@ -1,5 +1,5 @@
 import assert from "node:assert/strict"
-import { readFile } from "node:fs/promises"
+import { readFile, writeFile } from "node:fs/promises"
 import path from "node:path"
 import type { OrdenCompra } from "../src/sap/orden"
 import { CODIGOS_CONTROL } from "../src/tools/lib/configuracion"
@@ -212,11 +212,16 @@ prueba("execute nunca lanza: con argumentos basura devuelve { ok:false, error } 
 })
 
 prueba("execute nunca lanza aunque el contexto sea inválido (y avisa que no pudo escribir el log)", async () => {
+  // Raíz imposible en cualquier sistema (y aun como root): su "carpeta" padre es un archivo, así que
+  // crear out/ falla con ENOTDIR. Una ruta como "Z:/no/existe" solo falla en Windows: en Linux es
+  // una ruta relativa válida y el log se escribiría sin problema.
+  const archivo = path.join(await nuevaRaiz(), "soy-un-archivo")
+  await writeFile(archivo, "no es una carpeta")
   const avisos: string[] = []
   const original = console.error
   console.error = (...partes: unknown[]) => void avisos.push(partes.join(" "))
   try {
-    const salida = await oc.leer_paquete.execute({ caso: "sol-001" }, { directory: "Z:/no/existe", sessionId: "x" })
+    const salida = await oc.leer_paquete.execute({ caso: "sol-001" }, { directory: path.join(archivo, "raiz"), sessionId: "x" })
     assert.equal(leer(salida).ok, false)
   } finally {
     console.error = original
