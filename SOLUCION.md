@@ -1,12 +1,16 @@
 # SOLUCIÓN · Reto técnico 03: agente "Órdenes de Compra SAP"
 
-## 1. ¿Cuál es el problema, en una frase, y a quién le duele?
+Aquí explico cómo resolví el reto, qué decidí y por qué. Sigo el orden de la sección 9.1 del PRD, así que cada punto pedido tiene su apartado con el mismo número.
+
+Para probarlo, el link y la clave de acceso están al inicio del [README](README.md). Sin clave de ningún proveedor, `bun install && bun run demo.ts` recorre los seis casos en segundos.
+
+## 1. Problema en una frase y a quién le duele
 
 Cada orden de compra se digita a mano en SAP y sus controles (proveedor, aprobador, montos) se revisan de memoria, lo que consume tiempo, deja pasar errores que aparecen en el cierre contable e impide medir cuántas OC se crean después de que llega la factura.
 
 Le duele a la **analista administrativa**, que repite la digitación por cada factura; a **Contabilidad y Auditoría**, que corrigen errores y necesitan la evidencia de aprobación; y a la **dirección**, que no puede medir el desvío del proceso.
 
-## 2. ¿Cómo es la arquitectura y dónde viven el prompt, el conocimiento y la ejecución?
+## 2. Arquitectura: dónde viven el prompt, el conocimiento y la ejecución
 
 ```
 Navegador (web/)                  Backend Bun o Node 20+ (un solo proceso)                    Disco
@@ -31,7 +35,7 @@ demo.ts, las pruebas y modulo/ importan las mismas herramientas, sin servidor ni
 
 El principio es simple: el modelo conversa y orquesta, las herramientas deciden y recalculan, y el servidor custodia la confirmación. Cambiar una regla de negocio es editar `reglas.json`; cambiar cómo responde el agente es editar `prompt.md`. Ninguno de los dos toca el servidor.
 
-## 3. ¿Cómo implementé el ciclo del agente, el tope de iteraciones y la confirmación humana?
+## 3. Ciclo del agente: bucle, tope de iteraciones y confirmación humana
 
 ```
 al recibir un mensaje:
@@ -47,13 +51,19 @@ al recibir un mensaje:
 ```
 
 - **Tope de iteraciones:** 25 por turno, configurable. Si se alcanza, el agente responde qué hizo, qué falló y qué falta.
-- **Confirmación humana:** la impone el servidor, no el prompt. Vengo de seguridad y sé que una política sin un control técnico detrás termina incumpliéndose. El servidor sabe qué casos quedaron pendientes y abre una ventana de un solo turno: solo si el siguiente mensaje confirma ese caso, `oc_crear` puede recibir `confirmado: true`; si el modelo lo intenta antes, el servidor lo cambia a `false` y lo deja anotado. Ante la duda no confirma: una negación o un "si quieres…" no cuentan, y con varios casos pendientes hay que nombrar cuál. En el chat, ese estado se ve en una banda naranja.
+- **Confirmación humana:** la impone el servidor, no el prompt. Vengo de seguridad y sé que una política sin un control técnico detrás termina incumpliéndose.
+  - El servidor recuerda qué casos quedaron pendientes y abre una ventana de un solo turno. Solo si el siguiente mensaje confirma ese caso, `oc_crear` puede recibir `confirmado: true`.
+  - Si el modelo lo intenta antes, el servidor lo cambia a `false` y lo deja anotado en la llamada.
+  - Ante la duda no confirma: una negación o un "si quieres…" no cuentan, y con varios casos pendientes hay que nombrar cuál.
+  - En el chat, ese estado se ve en una banda naranja con el botón de confirmar.
 - **Valores solo de herramientas:** cada herramienta recalcula desde los archivos del caso y rechaza el paquete, los derivados o el payload si el modelo los alteró.
 - **Trazabilidad y errores:** cada llamada se ve en el chat mientras ocurre y queda en `out/log.jsonl`. Si Gemini falla o no responde, el agente lo dice en lenguaje claro y la sesión sigue: cada intento tiene un plazo de 30 s y se reintenta una vez.
 
-## 4. ¿Qué modelo elegí, por qué y cuánto cuesta un caso?
+## 4. Elección del modelo: proveedor, por qué y costo por caso
 
-Elegí **Google Gemini 3.5 Flash-Lite** por costo. Es un modelo ligero y, para esta tarea, es preciso: la complejidad es menor porque las reglas, los cálculos y las validaciones los hacen las herramientas, y al modelo solo le toca entender lo que pide la analista, llamar cinco herramientas en un orden conocido y explicar los resultados. Un modelo más grande no haría más correctos los controles, porque no los decide el modelo; solo subiría el costo y la latencia. Si algún día hiciera falta, se cambia con la variable `GEMINI_MODEL`.
+Elegí **Google Gemini 3.5 Flash-Lite** por costo, y porque esta tarea no necesita más. Las reglas, los cálculos y las validaciones los hacen las herramientas. Al modelo le toca entender lo que pide la analista, llamar cinco herramientas en un orden conocido y explicar los resultados.
+
+Un modelo más grande no haría más correctos los controles, porque no los decide el modelo; solo subiría el costo y la latencia. Si algún día hiciera falta, se cambia con la variable `GEMINI_MODEL`.
 
 Lo uso con el SDK oficial (`@google/genai`), en streaming, sin estado y con razonamiento bajo.
 
@@ -68,7 +78,7 @@ Costo medido con el modelo real (`bun run evaluar`), a precios del nivel pagado 
 
 Procesar una OC cuesta entre uno y tres centavos de dólar. Un caso completo tarda entre 10 y 20 segundos en local; en el link gratuito de Render, cerca de un minuto. Con 500 OC al mes serían unos US$ 10.
 
-## 5. ¿Cómo implementé RC1–RC10 y cuál fue el más difícil?
+## 5. Matriz de controles: RC1–RC10 y cuál fue la más difícil
 
 Todas las reglas son funciones deterministas en `src/tools/lib/reglas.ts`. El modelo nunca decide si una regla pasa.
 
@@ -89,15 +99,15 @@ Agregué tres controles que no cambian ningún caso del PRD: que el indicador de
 
 **La más difícil fue RC2 con RC3 en sol-003.** Si el aprobador se busca en cualquier centro, `fvargas` aparece en CC-3030 con tope de 80 M y el caso de 74 M pasaría, así que la búsqueda tiene que limitarse al centro de la solicitud. Además, en CC-2020 nadie puede aprobar 74 M (el tope máximo es 30 M), y el correo dice que la compra es "para el equipo de preventa", que está en CC-3030. La herramienta bloquea, explica las dos salidas (corregir el centro de costo o escalar la aprobación) y deja la decisión a la persona. El agente nunca corrige el centro por su cuenta.
 
-## 6. ¿Cómo diseñaría el adaptador SAP real?
+## 6. Diseño del adaptador SAP real
 
-### ¿Qué opción de integración elegiría y por qué?
+### Opción de integración y por qué
 
 **OData `API_PURCHASEORDER_PROCESS_SRV`**, la API estándar de órdenes de compra de S/4HANA, expuesta a través de SAP Integration Suite o API Management, con una salida por archivo como plan B desde el primer día. Es una API soportada, usa REST/JSON y crea cabecera, posiciones e imputación en una sola llamada atómica. Si el SAP fuera ECC, usaría `BAPI_PO_CREATE1` detrás de un servicio interno.
 
 Como la viabilidad no está confirmada, el agente solo conoce la interfaz `SapAdapter`: el simulado, el de OData o el de archivo cumplen el mismo contrato, y cambiar de uno a otro no toca las herramientas.
 
-### ¿Cómo mapeo el payload a la estructura real?
+### Mapeo del payload a la estructura real
 
 Con una inserción profunda sobre `A_PurchaseOrder`:
 
@@ -116,11 +126,11 @@ Con una inserción profunda sobre `A_PurchaseOrder`:
 | Evidencia de aprobación | Adjunto al objeto `BUS2012` (`API_CV_ATTACHMENT_SRV`) | El SHA-256 va en la descripción |
 | `excepciones` | Nota de cabecera | Qué se confirmó y quién |
 
-### ¿Cómo autentico y dónde viven las credenciales?
+### Autenticación y dónde viven las credenciales
 
 Con un usuario técnico de mínimo privilegio (solo crear y consultar OC en la sociedad 1000), mediante OAuth 2.0 *client credentials* o certificado X.509. Las credenciales viven en un gestor de secretos (Azure Key Vault o el servicio de destinos de BTP) y solo las usa el conector del servidor. Nunca están en el agente, en el prompt ni en el modelo: el modelo solo puede pedir `oc_crear`, y es la herramienta la que llama al conector.
 
-### ¿Cómo manejo la idempotencia y los errores parciales?
+### Idempotencia y errores parciales
 
 1. Antes de crear, busco la OC por la referencia (`solicitud_id`); si existe, devuelvo ese número.
 2. La creación es una sola llamada atómica: se crea todo o nada.
@@ -128,14 +138,14 @@ Con un usuario técnico de mínimo privilegio (solo crear y consultar OC en la s
 4. Si la OC se creó pero falló el adjunto de la evidencia, la registro como "creada sin evidencia" y reintento solo ese paso, que también es idempotente. Una OC nunca se borra automáticamente.
 5. Los mensajes de error de SAP se traducen a un texto claro para la analista; con la BAPI, cualquier error implica rollback.
 
-### ¿Cuál es el plan B si la conexión no es viable?
+### Plan B si la conexión no es viable
 
 El agente sigue ahorrando lo más caro, que es validar:
 
 - **OC lista para pegar:** se genera campo por campo en el orden de la transacción ME21N, con la evidencia lista. La analista la crea en SAP y le dicta al agente el número, que queda en el log de control.
 - **Carga masiva:** las OC aprobadas se escriben en la plantilla del Migration Cockpit para cargarlas en lote.
 
-## 7. ¿Qué le diría a la dirección sobre las OC retroactivas y qué cambio de proceso propondría?
+## 7. Lectura del proceso: qué le diría a la dirección sobre las OC retroactivas
 
 El caso sol-005 lo resume: la cotización es del 5 de agosto, la factura del 10, la solicitud del 27 y la aprobación del 28, con el mensaje "Ya llegó la factura, por favor crear la OC para poder radicarla". La compra se comprometió con el proveedor antes de existir la aprobación interna, y la OC solo dejó por escrito algo que ya había pasado.
 
@@ -149,7 +159,7 @@ Propondría tres pasos:
 
 El indicador para el comité sería el porcentaje mensual de OC retroactivas, con meta de reducción trimestral.
 
-## 8. ¿Qué decisiones tomé y qué alternativas descarté?
+## 8. Decisiones y trade-offs
 
 | Decisión | Alternativa descartada | Por qué |
 |---|---|---|
@@ -175,7 +185,7 @@ Las dependencias son las mínimas, con versión exacta y lockfile:
 | `pdf-lib` | La evidencia en PDF; solo genera, nunca interpreta PDFs externos |
 | `typescript`, `@types/node`, `tsx` | Desarrollo: chequeo de tipos y ejecución con Node 20+ |
 
-## 9. ¿Qué supuestos tomé al interpretar el PRD?
+## 9. Supuestos al interpretar el PRD
 
 - **Rúbrica:** la ficha remite a "la rúbrica de la sección 10", pero esa sección es de riesgos. Me guié por lo que el PRD dice que evalúa.
 - **Precios con IVA:** la solicitud y la cotización traen precios con IVA. El SAP simulado recibe el precio tal cual; el adaptador real lo convierte a neto.
@@ -191,7 +201,7 @@ Las dependencias son las mínimas, con versión exacta y lockfile:
 - **Log de control:** una fila por intento; un caso puede tener varias (pendiente y después creada) y vale la última.
 - **Evidencia:** el SHA-256 cubre los encabezados y el cuerpo del correo, que es lo que aparece antes de la línea separadora en `aprobacion.txt`.
 
-## 10. ¿Qué cubrí y qué falta para producción?
+## 10. Cobertura y qué falta para producción
 
 | Historia o requisito | Estado | Cómo lo verifiqué |
 |---|---|---|
@@ -216,11 +226,11 @@ Las dependencias son las mínimas, con versión exacta y lockfile:
 - adjuntar la evidencia en SAP;
 - correr en varias instancias.
 
-## 11. ¿Cómo usé la IA para construirlo?
+## 11. Uso de IA
 
 | Asistente | Para qué |
 |---|---|
-| **Claude Code** | Análisis del PRD y de los fixtures, diseño, implementación, pruebas, verificación del front en navegador, evaluación con el modelo real y documentación |
+| **Claude Code** | Análisis del PRD y de los fixtures, diseño, implementación, pruebas, verificación del front en navegador, evaluación con el modelo real y documentación. Al final, una revisión de seguridad y de cumplimiento del PRD antes de publicar el repositorio: exclusiones de Git, CI y despliegue en Render |
 | **Gemini** | Una primera lectura del PRD para contrastar mi análisis y resolver dudas puntuales sobre su API |
 
 Las decisiones de fondo fueron mías: el proveedor y el modelo, el runtime (Bun compatible con Node) y el alcance (los obligatorios, el PDF y el módulo). Mi criterio para aceptar una propuesta fue poder explicarla y que tuviera una prueba que la respaldara.
@@ -232,10 +242,11 @@ Las decisiones de fondo fueron mías: el proveedor y el modelo, el runtime (Bun 
 - **Exigir que el modelo reenviara el paquete completo:** el modelo omitía los campos nulos y la validación lo rechazaba. Acepté valores por defecto sin debilitar la verificación de integridad.
 - **Cerrar todos los procesos del navegador al terminar la prueba del front:** lo cambié por cerrar solo los procesos propios.
 - **Aceptar "si" como confirmación:** sin tildes, el "si quieres…" se confundía con un "sí". Una prueba lo detectó y ajusté la regla.
-- **Tomar la IP del cliente del primer valor de `X-Forwarded-For`:** en la revisión de seguridad previa a publicar el repositorio vi que en Render ese valor lo controla el cliente y permitía evadir el límite por IP. Lo cambié por contar los proxies desde la derecha y agregué el bloqueo por intentos fallidos de la clave de acceso, con sus pruebas.
+- **Tomar la IP del cliente del primer valor de `X-Forwarded-For`:** en la revisión de seguridad antes de publicar el repositorio salió que en Render ese valor lo escribe el propio cliente, así que el límite por IP se podía evadir. Lo cambié por contar los proxies desde la derecha y agregué el bloqueo por intentos fallidos de la clave de acceso, con sus pruebas.
+- **La primera explicación de por qué fallaban las pruebas en el CI:** Claude Code atribuyó la falla al formato de números según el idioma del sistema, y no era eso. En vez de seguir adivinando, hice que el CI publicara cada prueba fallida como anotación. Así apareció la causa real: una prueba usaba una ruta que solo es inválida en Windows. El cambio de formato lo dejé porque igual hace el resultado independiente del sistema.
 - **Dejar que el modelo armara la tabla de la OC:** en una prueba con Gemini se saltó `oc_construir_payload` e inventó el texto breve y la unidad. Ahora el prompt solo le permite mostrar la OC con los valores del payload, y la evaluación verifica el texto breve exacto.
 
-## 12. ¿Qué riesgos veo al llevarlo a producción y cómo los mitigaría?
+## 12. Riesgos de llevarlo a producción y cómo los mitigaría
 
 | Riesgo | Mitigación |
 |---|---|
