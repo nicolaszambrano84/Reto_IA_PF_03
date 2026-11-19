@@ -162,7 +162,9 @@ El indicador para el comité sería el porcentaje mensual de OC retroactivas, co
 | No validar el dígito de verificación del NIT | Validarlo con el algoritmo de la DIAN | 5 de los 6 NIT de las cotizaciones no lo cumplen (son ficticios); daría falsas alarmas |
 | `node:http` sin framework y front sin dependencias | Express o React | Menos superficie de ataque, el mismo código en Bun y en Node y una CSP estricta |
 | Si al despliegue le falta la clave del link, la API se bloquea | Arrancar abierta | Al verificar el link desde fuera lo encontré abierto, porque la variable quedó vacía en Render. Prefiero que un olvido de configuración bloquee el servicio a que exponga la cuota del modelo |
-| La clave del link se entrega por un canal seguro | Escribirla en el README, como sugiere el PRD | Un secreto escrito en el repositorio queda para siempre en el historial y en cada copia del código. Fuera del repositorio puedo cambiarla cuando quiera sin tocar el código |
+| La clave del link va en el README, como pide el PRD, y es exclusiva de la demo | Entregarla por un canal privado | El PRD la pide en el README. La traté como una clave de bajo valor: solo abre el chat, no da acceso a la clave del modelo ni a SAP, y el gasto queda acotado por el tope diario de tokens, el límite por IP y el bloqueo por intentos fallidos. Se rota en Render después de la evaluación sin tocar el código |
+| IP del cliente contando los proxies desde la derecha de `X-Forwarded-For` | Tomar el primer valor de la cabecera | El proxy de Render agrega al final y no limpia lo que manda el cliente: con el primer valor, cambiar la cabecera en cada petición evadía el límite por IP. Con el último, todos los usuarios compartirían la IP de Cloudflare |
+| Tras 10 claves equivocadas, la IP se bloquea 15 minutos aunque luego acierte | Solo responder 401 | Sin freno se puede adivinar la clave sin límite; si el bloqueo dejara pasar el acierto, el 200 lo delataría |
 
 Las dependencias son las mínimas, con versión exacta y lockfile:
 
@@ -199,7 +201,7 @@ Las dependencias son las mínimas, con versión exacta y lockfile:
 | HU-4 Evidencia | Hecho: txt y PDF | El hash se puede recalcular; el PDF sale idéntico en cada ejecución |
 | HU-5 Crear la OC | Hecho | Idempotencia, también con llamadas simultáneas, y log de control |
 | HU-6 Errores legibles | Hecho | Casos sin solicitud, con JSON roto, monto en texto y cotización ilegible |
-| Front, ciclo, API y adaptador LLM | Hecho | 77 pruebas automáticas, el front probado en navegador y evaluación con Gemini real |
+| Front, ciclo, API y adaptador LLM | Hecho | 80 pruebas automáticas (también en CI en cada push), el front probado en navegador y evaluación con Gemini real |
 | `oc_leer_excel` (P1 opcional) | No hecho | Prioricé el módulo reutilizable |
 | Módulo reutilizable (bonus) | Hecho | Las pruebas fallan si se aparta de las fuentes que usa la app |
 
@@ -230,6 +232,7 @@ Las decisiones de fondo fueron mías: el proveedor y el modelo, el runtime (Bun 
 - **Exigir que el modelo reenviara el paquete completo:** el modelo omitía los campos nulos y la validación lo rechazaba. Acepté valores por defecto sin debilitar la verificación de integridad.
 - **Cerrar todos los procesos del navegador al terminar la prueba del front:** lo cambié por cerrar solo los procesos propios.
 - **Aceptar "si" como confirmación:** sin tildes, el "si quieres…" se confundía con un "sí". Una prueba lo detectó y ajusté la regla.
+- **Tomar la IP del cliente del primer valor de `X-Forwarded-For`:** en la revisión de seguridad previa a publicar el repositorio vi que en Render ese valor lo controla el cliente y permitía evadir el límite por IP. Lo cambié por contar los proxies desde la derecha y agregué el bloqueo por intentos fallidos de la clave de acceso, con sus pruebas.
 - **Dejar que el modelo armara la tabla de la OC:** en una prueba con Gemini se saltó `oc_construir_payload` e inventó el texto breve y la unidad. Ahora el prompt solo le permite mostrar la OC con los valores del payload, y la evaluación verifica el texto breve exacto.
 
 ## 12. ¿Qué riesgos veo al llevarlo a producción y cómo los mitigaría?
@@ -242,7 +245,8 @@ Las decisiones de fondo fueron mías: el proveedor y el modelo, el runtime (Bun 
 | Que la respuesta del modelo inyecte código en el chat | El front escapa todo y la CSP prohíbe scripts en línea |
 | Fuga de la clave del modelo o de SAP | Solo en variables del servidor o en un gestor de secretos; se oculta en errores y logs; `.env` fuera de Git |
 | Datos enviados a un tercero (Google) | Solo el caso en curso y `store: false`; en producción, capa de pago o Vertex AI con acuerdo de tratamiento de datos (Ley 1581) |
-| Consumo sin límite | Topes de tokens por sesión y por día, límite por IP, clave de acceso (si falta en el despliegue, la API se bloquea) y límite de gasto en el proveedor |
+| Consumo sin límite | Topes de tokens por sesión y por día, límite por IP (con la IP real, no la que declara el cliente), clave de acceso (si falta en el despliegue, la API se bloquea) y límite de gasto en el proveedor |
+| La clave del link es pública por estar en el README | Es exclusiva de la demo y no da acceso a ningún otro secreto; el bloqueo por intentos fallidos, los topes de tokens y el límite por IP acotan su abuso; se rota al terminar la evaluación. En producción no habría clave compartida, sino SSO |
 | Proveedor caído o lento | Plazo por intento con reintento y mensaje claro; la lógica de negocio no depende del modelo |
 | OC duplicadas | Idempotencia por `solicitud_id`; en SAP real, referencia única y búsqueda antes de cualquier reintento |
 | Suplantación de proveedor o de aprobador | RC1, RC2 y el control de NIT de la cotización; los cambios de datos se verifican por un canal conocido |

@@ -9,8 +9,10 @@ El planteamiento completo de la solución está en [SOLUCION.md](SOLUCION.md).
 | | |
 |---|---|
 | URL | https://reto03-ordenes-compra-a9yn.onrender.com |
-| Clave de acceso | Se entrega por un canal seguro; no está en el repositorio. El chat la pide al entrar y en la API va en la cabecera `x-access-key` |
+| Clave de acceso | `27ykEp8V_ZiiruPc9RHt82xl7HMeB_MU` (el chat la pide al entrar; en la API va en la cabecera `x-access-key`) |
 | Modelo | Google Gemini (`gemini-3.5-flash-lite`) |
+
+La clave es exclusiva de esta demo y se entrega aquí porque el PRD lo pide (§6.1 y §9.2). Solo abre el chat: no da acceso a la clave del modelo, que vive únicamente en el servidor. El uso queda acotado por el tope diario de tokens, el límite de mensajes por IP y el bloqueo tras 10 claves equivocadas. Se cambia en Render después de la evaluación, sin tocar el código.
 
 El plan gratuito de Render duerme tras 15 minutos sin uso: la primera carga puede tardar cerca de un minuto.
 
@@ -55,9 +57,9 @@ Todas son opcionales; los valores por defecto están en [.env.example](.env.exam
 | `MAX_TOKENS_SESION` | Tope de tokens por sesión | `400000` |
 | `MAX_TOKENS_DIA` | Tope global de tokens por día (una sesión nueva no lo evita) | `3000000` |
 | `MAX_MENSAJES_POR_MINUTO` | Mensajes por minuto por IP | `12` |
-| `ACCESS_KEY` | Si se define, la API y `out/` exigen la cabecera `x-access-key` | (sin clave) |
+| `ACCESS_KEY` | Si se define (mínimo 16 caracteres), la API y `out/` exigen la cabecera `x-access-key` | (sin clave) |
 | `EXIGIR_ACCESS_KEY` | `1` en despliegues públicos: si falta `ACCESS_KEY`, la API se bloquea en vez de quedar abierta | `0` |
-| `TRUST_PROXY` | `1` detrás de un proxy confiable (Render) | `0` |
+| `TRUST_PROXY` | Número de proxies confiables delante de la app, para tomar la IP real del cliente de `X-Forwarded-For` contando desde la derecha. En Render: `2` (Cloudflare + su proxy) | `0` |
 | `PORT` | Puerto HTTP | `3000` |
 
 ## Demo sin modelo
@@ -80,17 +82,17 @@ Procesa los 6 casos llamando directo a las herramientas, sin servidor ni clave d
 ## Pruebas y verificaciones
 
 ```bash
-bun run test           # 77 pruebas: reglas, contrato de herramientas, seguridad, ciclo, servidor y módulo (sin modelo)
+bun run test           # 80 pruebas: reglas, contrato de herramientas, seguridad, ciclo, servidor y módulo (sin modelo)
 bun run typecheck      # TypeScript estricto, sin any
 bun run modulo:check   # modulo/ coincide con las fuentes que usa la aplicación
 bun run evaluar        # evaluación con Gemini real: 7 escenarios, tokens y costo (requiere GEMINI_API_KEY)
 ```
 
-Con Node: `npm run test:node`.
+Con Node: `npm run test:node`. Cada push a `main` corre lo mismo en GitHub Actions ([.github/workflows/ci.yml](.github/workflows/ci.yml)), más una verificación de que no se subieron secretos, `.env`, `out/` ni `node_modules/`.
 
 ## API
 
-Si `ACCESS_KEY` está definida, todas las rutas salvo `/api/health` y el front exigen la cabecera `x-access-key`. Los cuerpos son JSON (`Content-Type: application/json`).
+Si `ACCESS_KEY` está definida, todas las rutas salvo `/api/health` y el front exigen la cabecera `x-access-key` (sin ella o incorrecta: 401; tras 10 claves equivocadas desde una IP en 15 minutos: 429, aunque después acierte). Los cuerpos son JSON (`Content-Type: application/json`).
 
 | Método | Ruta | Cuerpo / respuesta |
 |---|---|---|
@@ -107,6 +109,12 @@ Cada elemento de `toolCalls` trae `nombre`, `argumentos`, `ok`, `resultado` (los
 curl -s -X POST http://localhost:3000/api/chat \
   -H "Content-Type: application/json" \
   -d '{"message":"Procesa la solicitud sol-001"}'
+
+# Contra el link público (con la clave de acceso)
+curl -s https://reto03-ordenes-compra-a9yn.onrender.com/api/health
+curl -s -X POST https://reto03-ordenes-compra-a9yn.onrender.com/api/chat \
+  -H "Content-Type: application/json" -H "x-access-key: 27ykEp8V_ZiiruPc9RHt82xl7HMeB_MU" \
+  -d '{"message":"Procesa la solicitud sol-002"}'
 ```
 
 ## Estructura
@@ -126,6 +134,8 @@ web/                               front de chat (HTML, CSS y JS sin dependencia
 fixtures/reto-03/                  entregados por Periferia, sin modificar
 modulo/                            el agente empaquetado para otras plataformas (bonus)
 demo.ts · tests/ · scripts/        demo sin modelo, pruebas y utilidades
+Dockerfile · render.yaml           imagen sin privilegios y blueprint de Render
+.github/workflows/ci.yml           CI: tipos, pruebas, demo, módulo y guarda de secretos
 ```
 
 ## Archivos que genera (`out/`)
@@ -146,4 +156,12 @@ Para verificar una evidencia, calcula el SHA-256 de todo lo que está antes de l
 
 ## Despliegue (Render)
 
-`render.yaml` define el servicio (Docker, plan gratuito, verificación de salud en `/api/health`). En Render: **New → Blueprint →** este repositorio, y completar `GEMINI_API_KEY` y `ACCESS_KEY` cuando los pida. Cada push a `main` vuelve a desplegar.
+`render.yaml` define el servicio: Docker con usuario sin privilegios, plan gratuito, verificación de salud en `/api/health`, `EXIGIR_ACCESS_KEY=1` (sin clave la API se bloquea en vez de quedar abierta) y `TRUST_PROXY=2`. Cada push a `main` vuelve a desplegar.
+
+1. En Render: **New → Blueprint →** conectar este repositorio (`main`).
+2. Cuando lo pida, completar los dos secretos (nunca van en el repositorio):
+   - `GEMINI_API_KEY`: clave de Google AI Studio, idealmente de un proyecto exclusivo y con límite de gasto.
+   - `ACCESS_KEY`: la clave de acceso de la tabla de arriba.
+3. Esperar el primer despliegue y verificar: `GET /api/health` responde `{ ok: true, provider: "gemini", … }`, y `GET /api/config` sin clave responde 401.
+
+Para cambiar la clave de acceso: generar una nueva (`node -e "console.log(require('crypto').randomBytes(24).toString('base64url'))"`), reemplazarla en **Environment** de Render y en este README.

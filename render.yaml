@@ -1,6 +1,6 @@
 # Blueprint de Render: New → Blueprint → seleccionar este repositorio.
-# Los secretos (GEMINI_API_KEY y ACCESS_KEY) se piden al crear el servicio (sync: false) y nunca se
-# guardan en el repositorio. Cada push a main vuelve a desplegar.
+# GEMINI_API_KEY y ACCESS_KEY se piden al crear el servicio (sync: false): sus valores no se guardan
+# en este archivo. GEMINI_API_KEY nunca sale del servidor. Cada push a main vuelve a desplegar.
 services:
   - type: web
     name: reto03-ordenes-compra
@@ -19,8 +19,8 @@ services:
         value: low
       - key: GEMINI_API_KEY
         sync: false
-      # Clave del link: se entrega por un canal seguro y nunca se guarda en el repositorio.
-      # Protege la cuota del modelo frente a usos no autorizados.
+      # Clave del link (mínimo 16 caracteres): se carga en Render y se publica en el README, como pide
+      # el PRD. Es exclusiva de la demo, protege la cuota del modelo y se rota tras la evaluación.
       - key: ACCESS_KEY
         sync: false
       # Falla cerrado: si ACCESS_KEY quedó vacía, la API se bloquea (503) en vez de quedar abierta.
