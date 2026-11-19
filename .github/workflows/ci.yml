@@ -1,0 +1,52 @@
+# Verificación en cada push y pull request: tipos, pruebas, demo sin modelo, módulo y secretos.
+# No usa claves de ningún proveedor: todo corre con el modelo simulado.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Mínimo privilegio: el flujo solo lee el repositorio.
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verificar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # La misma versión de Bun que la imagen de Render (Dockerfile), sin acciones de terceros.
+    container: oven/bun:1.4.5
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - name: Sin secretos ni salidas en el repositorio
+        run: |
+          set -e
+          for prohibido in .env out node_modules; do
+            if [ -e "$prohibido" ]; then echo "::error::$prohibido no debe estar en el repositorio"; exit 1; fi
+          done
+          if grep -rIEl "AIza[0-9A-Za-z_-]{35}|sk-[A-Za-z0-9_-]{32,}|ghp_[A-Za-z0-9]{36}" .; then
+            echo "::error::Posible clave de API en el repositorio"; exit 1
+          fi
+
+      - name: Dependencias (exactas, desde el lockfile)
+        run: bun install --frozen-lockfile
+
+      - name: TypeScript estricto
+        run: bun run typecheck
+
+      - name: Pruebas
+        run: bun run test
+
+      - name: Demo sin modelo (PRD §6.6)
+        run: bun run demo.ts
+
+      - name: modulo/ sincronizado con las fuentes (bonus §9.4)
+        run: bun run modulo:check
