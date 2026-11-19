@@ -1,0 +1,35 @@
+# Blueprint de Render: New → Blueprint → seleccionar este repositorio.
+# Los secretos (GEMINI_API_KEY y ACCESS_KEY) se piden al crear el servicio (sync: false) y nunca se
+# guardan en el repositorio. Cada push a main vuelve a desplegar.
+services:
+  - type: web
+    name: reto03-ordenes-compra
+    runtime: docker
+    plan: free
+    region: virginia
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      # gemini (no auto): si falta la clave, el servicio falla al arrancar en vez de quedar en modo simulado.
+      - key: LLM_PROVIDER
+        value: gemini
+      - key: GEMINI_MODEL
+        value: gemini-3.5-flash-lite
+      - key: GEMINI_THINKING
+        value: low
+      - key: GEMINI_API_KEY
+        sync: false
+      # Clave del link: se entrega por un canal seguro y nunca se guarda en el repositorio.
+      # Protege la cuota del modelo frente a usos no autorizados.
+      - key: ACCESS_KEY
+        sync: false
+      # Falla cerrado: si ACCESS_KEY quedó vacía, la API se bloquea (503) en vez de quedar abierta.
+      - key: EXIGIR_ACCESS_KEY
+        value: "1"
+      # Render atiende detrás de su proxy: el límite por IP usa la IP real del cliente.
+      - key: TRUST_PROXY
+        value: "1"
+      - key: MAX_TOKENS_DIA
+        value: "2000000"
+      - key: MAX_MENSAJES_POR_MINUTO
+        value: "12"
