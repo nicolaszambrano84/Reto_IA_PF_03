@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Agente de órdenes de compra</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="/estilos.css" />
+    <script src="/app.js" defer></script>
+  </head>
+  <body>
+    <header class="cabecera">
+      <div>
+        <h1>Agente de órdenes de compra <span class="sap">SAP</span></h1>
+        <p class="subtitulo">Lee el paquete, valida contra los maestros y crea la OC en un SAP simulado. Las excepciones las decides tú.</p>
+      </div>
+      <div class="cabecera-acciones">
+        <span id="proveedor" class="insignia" title="Proveedor y modelo de lenguaje activos">…</span>
+        <button id="nueva-sesion" type="button" class="secundario">Nueva sesión</button>
+      </div>
+    </header>
+
+    <div id="aviso" class="aviso" hidden></div>
+
+    <section class="atajos" aria-label="Atajos">
+      <span class="etiqueta">Procesar:</span>
+      <div id="casos" class="casos"></div>
+      <button id="prompt-demo" type="button" class="secundario">Prompt de la demo (§11)</button>
+      <button id="ver-control" type="button" class="secundario">Ver log de control</button>
+    </section>
+
+    <main id="chat" class="chat" aria-live="polite">
+      <div class="bienvenida">
+        <p>Escribe, por ejemplo, <em>«Procesa la solicitud sol-001»</em>. Verás cada llamada a herramienta con sus argumentos y su resultado; cuando una OC requiera tu confirmación, aparecerá resaltada abajo.</p>
+      </div>
+    </main>
+
+    <section id="confirmacion" class="confirmacion" hidden aria-live="assertive">
+      <div>
+        <strong>El agente espera tu confirmación</strong>
+        <p id="confirmacion-detalle">No se creará ninguna OC hasta que confirmes.</p>
+      </div>
+      <div id="confirmacion-botones" class="confirmacion-botones"></div>
+    </section>
+
+    <form id="formulario" class="formulario">
+      <label for="mensaje" class="oculto">Mensaje</label>
+      <textarea id="mensaje" rows="2" maxlength="4000" placeholder="Escribe tu mensaje (Enter envía, Shift+Enter salta de línea)"></textarea>
+      <button id="enviar" type="submit">Enviar</button>
+    </form>
+
+    <dialog id="dialogo-clave">
+      <form method="dialog" id="form-clave">
+        <h2>Clave de acceso</h2>
+        <p>Este agente está protegido. Escribe la clave de acceso que te compartieron.</p>
+        <label for="clave">Clave</label>
+        <input id="clave" type="password" autocomplete="off" required />
+        <div class="dialogo-botones">
+          <button value="cancelar" type="submit" formnovalidate class="secundario">Cancelar</button>
+          <button value="ok" type="submit">Entrar</button>
+        </div>
+      </form>
+    </dialog>
+  </body>
+</html>

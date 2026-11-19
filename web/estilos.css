@@ -1,0 +1,152 @@
+:root {
+  --fondo: #f5f6f8;
+  --superficie: #ffffff;
+  --texto: #1d232b;
+  --tenue: #5b6672;
+  --borde: #d9dee4;
+  --primario: #1f5fbf;
+  --primario-texto: #ffffff;
+  --usuario: #e8f0fc;
+  --ok: #1e7f4f;
+  --error: #b42318;
+  --alerta: #b45309;
+  --alerta-fondo: #fff4e5;
+  --codigo: #f0f2f5;
+  --sombra: 0 1px 2px rgba(16, 24, 40, 0.06);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --fondo: #12161c;
+    --superficie: #1b2129;
+    --texto: #e6e9ee;
+    --tenue: #9aa5b1;
+    --borde: #2c3540;
+    --primario: #5b9bf5;
+    --primario-texto: #0b1220;
+    --usuario: #1f2c40;
+    --ok: #4cc38a;
+    --error: #ff7b72;
+    --alerta: #f0a35c;
+    --alerta-fondo: #2b2116;
+    --codigo: #232a33;
+  }
+}
+
+* { box-sizing: border-box; }
+/* El atributo hidden debe ganarle a cualquier display de las clases (si no, la banda nunca se oculta). */
+[hidden] { display: none !important; }
+body {
+  margin: 0;
+  font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  background: var(--fondo);
+  color: var(--texto);
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+button {
+  font: inherit;
+  border: 1px solid var(--primario);
+  background: var(--primario);
+  color: var(--primario-texto);
+  border-radius: 8px;
+  padding: 0.45rem 0.9rem;
+  cursor: pointer;
+}
+button.secundario { background: transparent; color: var(--primario); }
+button:disabled { opacity: 0.5; cursor: not-allowed; }
+code, pre { font-family: ui-monospace, "Cascadia Code", Consolas, monospace; font-size: 0.86em; }
+.oculto { position: absolute; left: -9999px; }
+
+.cabecera {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.8rem 1.2rem;
+  background: var(--superficie);
+  border-bottom: 1px solid var(--borde);
+}
+.cabecera h1 { font-size: 1.15rem; margin: 0; }
+.sap { color: var(--primario); }
+.subtitulo { margin: 0.1rem 0 0; color: var(--tenue); font-size: 0.88rem; }
+.cabecera-acciones { display: flex; gap: 0.6rem; align-items: center; }
+.insignia { font-size: 0.8rem; border: 1px solid var(--borde); border-radius: 999px; padding: 0.2rem 0.7rem; color: var(--tenue); white-space: nowrap; }
+
+.aviso { background: var(--alerta-fondo); color: var(--alerta); padding: 0.5rem 1.2rem; font-size: 0.9rem; border-bottom: 1px solid var(--borde); }
+
+.atajos { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; padding: 0.6rem 1.2rem; border-bottom: 1px solid var(--borde); }
+.atajos .etiqueta { color: var(--tenue); font-size: 0.88rem; }
+.casos { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.casos button { padding: 0.25rem 0.65rem; font-size: 0.85rem; }
+
+.chat { flex: 1; overflow-y: auto; padding: 1rem 1.2rem; display: flex; flex-direction: column; gap: 0.9rem; }
+.bienvenida { color: var(--tenue); max-width: 760px; }
+.mensaje { max-width: 920px; border-radius: 12px; padding: 0.7rem 0.95rem; box-shadow: var(--sombra); }
+.mensaje.usuario { align-self: flex-end; background: var(--usuario); white-space: pre-wrap; }
+.mensaje.asistente { align-self: flex-start; background: var(--superficie); border: 1px solid var(--borde); width: min(920px, 100%); }
+.mensaje.asistente.espera-confirmacion { border: 2px solid var(--alerta); }
+.mensaje.error { border-color: var(--error); color: var(--error); }
+.mensaje table { border-collapse: collapse; margin: 0.5rem 0; font-size: 0.9rem; display: block; overflow-x: auto; }
+.mensaje th, .mensaje td { border: 1px solid var(--borde); padding: 0.3rem 0.55rem; text-align: left; vertical-align: top; }
+.mensaje th { background: var(--codigo); }
+.mensaje code { background: var(--codigo); padding: 0.05rem 0.3rem; border-radius: 4px; }
+.mensaje p { margin: 0.4rem 0; }
+.mensaje ul, .mensaje ol { margin: 0.3rem 0; padding-left: 1.3rem; }
+.mensaje a.archivo { color: var(--primario); }
+
+.pensando { color: var(--tenue); font-size: 0.9rem; display: flex; align-items: center; gap: 0.5rem; }
+.pensando::before { content: ""; width: 0.8rem; height: 0.8rem; border: 2px solid var(--borde); border-top-color: var(--primario); border-radius: 50%; animation: girar 0.8s linear infinite; }
+@keyframes girar { to { transform: rotate(360deg); } }
+
+.herramientas { display: flex; flex-direction: column; gap: 0.35rem; margin-bottom: 0.5rem; }
+details.herramienta { border: 1px solid var(--borde); border-left: 4px solid var(--ok); border-radius: 8px; background: var(--fondo); font-size: 0.88rem; }
+details.herramienta.fallo { border-left-color: var(--error); }
+details.herramienta.compuerta { border-left-color: var(--alerta); }
+details.herramienta summary { cursor: pointer; padding: 0.35rem 0.6rem; display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: baseline; }
+details.herramienta summary .resumen { color: var(--tenue); }
+details.herramienta .marca-compuerta { color: var(--alerta); font-weight: 600; }
+details.herramienta .cuerpo { padding: 0 0.6rem 0.6rem; }
+details.herramienta h4 { margin: 0.5rem 0 0.2rem; font-size: 0.8rem; color: var(--tenue); text-transform: uppercase; letter-spacing: 0.03em; }
+details.herramienta pre { margin: 0; max-height: 260px; overflow: auto; background: var(--superficie); border: 1px solid var(--borde); border-radius: 6px; padding: 0.5rem; white-space: pre-wrap; word-break: break-word; }
+
+.confirmacion {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin: 0 1.2rem;
+  padding: 0.7rem 1rem;
+  border: 2px solid var(--alerta);
+  background: var(--alerta-fondo);
+  border-radius: 10px;
+}
+.confirmacion p { margin: 0.15rem 0 0; font-size: 0.9rem; }
+.confirmacion strong { color: var(--alerta); }
+.confirmacion-botones { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.confirmacion-botones button.confirmar { background: var(--alerta); border-color: var(--alerta); color: #fff; }
+
+.formulario { display: flex; gap: 0.6rem; padding: 0.8rem 1.2rem 1rem; }
+.formulario textarea {
+  flex: 1;
+  font: inherit;
+  resize: vertical;
+  min-height: 2.8rem;
+  max-height: 10rem;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--borde);
+  border-radius: 8px;
+  background: var(--superficie);
+  color: var(--texto);
+}
+
+dialog { border: 1px solid var(--borde); border-radius: 12px; background: var(--superficie); color: var(--texto); max-width: 380px; }
+dialog::backdrop { background: rgba(0, 0, 0, 0.45); }
+dialog input { width: 100%; font: inherit; padding: 0.45rem; margin: 0.3rem 0 0.8rem; border: 1px solid var(--borde); border-radius: 6px; background: var(--fondo); color: var(--texto); }
+.dialogo-botones { display: flex; justify-content: flex-end; gap: 0.5rem; }
+
+@media (max-width: 640px) {
+  .cabecera { flex-direction: column; align-items: flex-start; }
+  .confirmacion { flex-direction: column; align-items: flex-start; }
+  .chat, .atajos, .formulario { padding-left: 0.8rem; padding-right: 0.8rem; }
+}
