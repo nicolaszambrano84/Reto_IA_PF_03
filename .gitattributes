@@ -1,0 +1,8 @@
+# Finales de línea LF en el repositorio, sin importar el sistema de quien clone (Windows, Linux o la imagen de Render).
+* text=auto eol=lf
+
+# Binarios: sin conversión
+*.pdf binary
+*.png binary
+*.jpg binary
+*.xlsx binary

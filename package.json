@@ -1,0 +1,35 @@
+{
+  "name": "reto-03-ordenes-compra-sap",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Agente conversacional que prepara, valida y crea órdenes de compra en un SAP simulado, con confirmación humana.",
+  "type": "module",
+  "engines": {
+    "node": ">=20",
+    "bun": ">=1.1"
+  },
+  "scripts": {
+    "dev": "bun --watch src/server.ts",
+    "start": "bun src/server.ts",
+    "demo": "bun run demo.ts",
+    "test": "bun tests/todas.ts",
+    "typecheck": "tsc --noEmit",
+    "modulo": "bun scripts/modulo.ts",
+    "modulo:check": "bun scripts/modulo.ts --check",
+    "evaluar": "bun scripts/evaluar-modelo.ts",
+    "dev:node": "tsx watch src/server.ts",
+    "start:node": "tsx src/server.ts",
+    "demo:node": "tsx demo.ts",
+    "test:node": "tsx tests/todas.ts"
+  },
+  "dependencies": {
+    "@google/genai": "3.6.1",
+    "pdf-lib": "1.17.1",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.6",
+    "tsx": "4.23.15",
+    "typescript": "7.0.2"
+  }
+}

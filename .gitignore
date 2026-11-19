@@ -1,0 +1,26 @@
+# Dependencias (PRD §9.5: sin node_modules/)
+node_modules/
+
+# Salidas en ejecución (PRD §9.5: sin out/): OC simuladas, log de control, evidencias y sesiones
+out/
+
+# Secretos (PRD §9.5: sin .env). Solo se versiona la plantilla sin valores.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Registros y temporales
+*.log
+npm-debug.log*
+.cache/
+coverage/
+*.tsbuildinfo
+
+# Editor y sistema operativo
+.vscode/
+.idea/
+.claude/
+.DS_Store
+Thumbs.db
