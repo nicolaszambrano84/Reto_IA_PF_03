@@ -8,7 +8,7 @@ El planteamiento completo de la solución está en [SOLUCION.md](SOLUCION.md).
 
 | | |
 |---|---|
-| URL | https://reto03-ordenes-compra-a9yn.onrender.com |
+| URL | https://reto03-ordenes-compra-e33s.onrender.com |
 | Clave de acceso | `27ykEp8V_ZiiruPc9RHt82xl7HMeB_MU` (el chat la pide al entrar; en la API va en la cabecera `x-access-key`) |
 | Modelo | Google Gemini (`gemini-3.5-flash-lite`) |
 
@@ -111,8 +111,8 @@ curl -s -X POST http://localhost:3000/api/chat \
   -d '{"message":"Procesa la solicitud sol-001"}'
 
 # Contra el link público (con la clave de acceso)
-curl -s https://reto03-ordenes-compra-a9yn.onrender.com/api/health
-curl -s -X POST https://reto03-ordenes-compra-a9yn.onrender.com/api/chat \
+curl -s https://reto03-ordenes-compra-e33s.onrender.com/api/health
+curl -s -X POST https://reto03-ordenes-compra-e33s.onrender.com/api/chat \
   -H "Content-Type: application/json" -H "x-access-key: 27ykEp8V_ZiiruPc9RHt82xl7HMeB_MU" \
   -d '{"message":"Procesa la solicitud sol-002"}'
 ```
