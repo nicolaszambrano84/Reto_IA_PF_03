@@ -1,0 +1,122 @@
+{
+  "descripcion": "Parámetros de negocio del proceso de órdenes de compra. Las herramientas los cargan y validan al arrancar: cambiar una regla aquí no requiere tocar el servidor ni el código.",
+  "organizacion": {
+    "sociedad": "1000",
+    "organizacion_compras": "1000"
+  },
+  "sap": {
+    "numero_oc_inicial": 4500000001,
+    "max_descripcion": 40,
+    "paso_posicion": 10
+  },
+  "tolerancias": {
+    "cotizacion_pct": 2,
+    "redondeo_total": 1
+  },
+  "aprobacion": {
+    "patron_aprobado": "\\baprobad[oa]s?\\b",
+    "patrones_negacion": [
+      "\\bno\\s+(?:esta\\s+|queda\\s+|fue\\s+|es\\s+|ha\\s+sido\\s+)?aprobad",
+      "\\bdesaprobad",
+      "\\brechazad",
+      "\\bno\\s+(?:se\\s+)?aprueb"
+    ]
+  },
+  "unidades": {
+    "por_defecto": "UN",
+    "palabras": {
+      "H": ["hora", "horas"],
+      "MES": ["mes", "meses"]
+    }
+  },
+  "controles": {
+    "RC1": {
+      "nombre": "Proveedor registrado y activo",
+      "acciones": {
+        "inexistente": "Pedir a Compras el alta del proveedor en el maestro de SAP (con RUT y certificación bancaria) o confirmar con el solicitante si la compra debe hacerse con un proveedor ya registrado.",
+        "homonimo": "Verificar el NIT con el solicitante: el nombre coincide con un proveedor registrado pero el NIT no; puede ser un error de digitación o una suplantación del proveedor.",
+        "inactivo": "Confirmar con Compras si el proveedor debe reactivarse o si la compra se asigna a otro proveedor activo."
+      }
+    },
+    "RC2": {
+      "nombre": "Aprobación explícita de un aprobador del centro de costo",
+      "acciones": {
+        "sin_aprobacion": "Pedir al solicitante el correo de aprobación de su líder.",
+        "no_aprobado": "Pedir al líder una respuesta explícita con la palabra «Aprobado»: el correo recibido no aprueba la compra.",
+        "no_autorizado": "Pedir la aprobación a un aprobador autorizado del centro de costo o, si el centro de costo está mal, que el solicitante corrija la solicitud. El agente no cambia el centro de costo por su cuenta."
+      }
+    },
+    "RC3": {
+      "nombre": "Monto dentro del tope del aprobador en ese centro",
+      "acciones": {
+        "excede": "Escalar la aprobación a un aprobador del centro con tope suficiente para el monto.",
+        "sin_atribucion": "Obtener la aprobación de un aprobador del centro de costo con tope suficiente para el monto.",
+        "sin_tope_en_centro": "Ningún aprobador del centro tiene tope suficiente: escalar a la dirección o actualizar la matriz de aprobación antes de crear la OC."
+      }
+    },
+    "RC4": {
+      "nombre": "Subárea pertenece al centro de costo",
+      "acciones": {
+        "centro_inexistente": "Pedir al solicitante el centro de costo correcto: el indicado no existe en el maestro.",
+        "subarea": "Pedir al solicitante corregir la subárea o el centro de costo; no se corrige automáticamente."
+      }
+    },
+    "RC5": {
+      "nombre": "Cotización coincide con la solicitud (tolerancia ±2 %)",
+      "acciones": {
+        "diferencia": "Confirmar con el solicitante cuál valor es el correcto. La OC se crea por el valor de la solicitud (el aprobado), nunca por el de la cotización; si el valor real es el cotizado, se requiere una nueva aprobación o ajustar la cotización con el proveedor.",
+        "sin_cotizacion": "Pedir la cotización del proveedor o confirmar explícitamente que la compra procede sin cotización.",
+        "moneda": "Confirmar la moneda con el solicitante: la cotización y la solicitud están en monedas distintas."
+      }
+    },
+    "RC6": {
+      "nombre": "Indicador de IVA informado",
+      "acciones": {
+        "derivado": "Confirmar el indicador de IVA tomado del maestro del proveedor o pedir al solicitante el indicador correcto."
+      }
+    },
+    "RC7": {
+      "nombre": "Condiciones de pago informadas",
+      "acciones": {
+        "derivado": "Solo informativo: se usó la condición de pago por defecto del proveedor."
+      }
+    },
+    "RC8": {
+      "nombre": "Factura posterior a la solicitud (OC no retroactiva)",
+      "acciones": {
+        "retroactiva": "OC retroactiva: la factura llegó antes que la solicitud. Crear solo con confirmación; queda marcada en el log de control para medir el desvío del proceso."
+      }
+    },
+    "RC9": {
+      "nombre": "Aprobación igual o posterior a la solicitud",
+      "acciones": {
+        "anterior": "Confirmar que la aprobación corresponde a esta compra: es anterior a la fecha de la solicitud.",
+        "ilegible": "Confirmar la fecha de la aprobación: no se pudo leer del correo."
+      }
+    },
+    "RC10": {
+      "nombre": "Cantidad × valor unitario = valor total (±1)",
+      "acciones": {
+        "incoherente": "Pedir al solicitante corregir la cantidad, el valor unitario o el valor total de la solicitud."
+      }
+    },
+    "RX1": {
+      "nombre": "Indicador de IVA existe en el maestro",
+      "acciones": {
+        "invalido": "Pedir el indicador de IVA correcto: el código no existe en el maestro y SAP rechazaría la OC."
+      }
+    },
+    "RX2": {
+      "nombre": "Condición de pago existe en el maestro",
+      "acciones": {
+        "invalido": "Pedir la condición de pago correcta: el código no existe en el maestro y SAP rechazaría la OC."
+      }
+    },
+    "RX3": {
+      "nombre": "NIT de la cotización coincide con el del proveedor",
+      "acciones": {
+        "distinto": "Verificar con el proveedor, por un canal ya conocido (no respondiendo al correo recibido), que la cotización es suya: un NIT distinto puede indicar una suplantación."
+      }
+    }
+  }
+}
