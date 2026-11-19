@@ -42,10 +42,23 @@ export async function ejecutarPruebas(): Promise<void> {
       console.log(`  ✔ ${p.nombre}`)
     } catch (e) {
       fallas += 1
-      console.log(`  ✘ ${p.nombre}\n      ${e instanceof Error ? e.message.split("\n").join("\n      ") : String(e)}`)
+      const mensaje = e instanceof Error ? e.message : String(e)
+      console.log(`  ✘ ${p.nombre}\n      ${mensaje.split("\n").join("\n      ")}`)
+      anotarEnCi(`${p.grupo} › ${p.nombre}`, mensaje)
     }
   }
   await Promise.all(temporales.map((t) => rm(t, { recursive: true, force: true })))
   console.log(`\n${pruebas.length - fallas}/${pruebas.length} pruebas correctas`)
   if (fallas > 0) process.exit(1)
+}
+
+/**
+ * En GitHub Actions, cada prueba fallida queda también como anotación del check: se ve en la página
+ * del commit sin abrir el log completo. Formato de comandos de flujo de GitHub (los saltos de línea
+ * y % van codificados).
+ */
+function anotarEnCi(titulo: string, mensaje: string): void {
+  if (process.env.GITHUB_ACTIONS !== "true") return
+  const codificar = (t: string) => t.replace(/%/g, "%25").replace(/\r/g, "%0D").replace(/\n/g, "%0A")
+  console.log(`::error title=${codificar(titulo).replace(/[:,]/g, " ")}::${codificar(mensaje.slice(0, 2000))}`)
 }

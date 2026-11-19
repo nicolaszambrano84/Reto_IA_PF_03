@@ -3,6 +3,7 @@ import { casosAutorizados, preguntaConfirmacion, terminaEnPregunta, type Pendien
 import type { PresupuestoDiario } from "./consumo"
 import { DEFINICIONES, ejecutarHerramienta } from "./herramientas"
 import type { LlamadaVisible, Sesion } from "./sesiones"
+import { formatoMonto } from "../tools/lib/texto"
 
 /**
  * Ciclo del agente (PRD §6.3): mensaje del usuario → (modelo → herramientas)* → respuesta.
@@ -170,7 +171,8 @@ function solicitudDe(data: unknown): string | null {
 
 function topeDeConsumo(sesion: Sesion, d: DependenciasCiclo): string | null {
   if (sesion.tokens.entrada + sesion.tokens.salida >= d.maxTokensSesion) {
-    return `Esta sesión alcanzó su tope de ${d.maxTokensSesion.toLocaleString("es-CO")} tokens. Abre una sesión nueva para continuar.`
+    // formatoMonto y no toLocaleString: el resultado de este último depende de los datos ICU del runtime.
+    return `Esta sesión alcanzó su tope de ${formatoMonto(d.maxTokensSesion)} tokens. Abre una sesión nueva para continuar.`
   }
   if (d.presupuesto.agotado()) return "Se alcanzó el tope diario de uso del modelo en este servidor. Intenta de nuevo mañana."
   return null
